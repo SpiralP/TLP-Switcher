@@ -6,6 +6,8 @@ const Lang = imports.lang;
 const GLib = imports.gi.GLib;
 const Me = imports.misc.extensionUtils.getCurrentExtension();
 const Util = imports.misc.util;
+const Clutter = imports.gi.Clutter;
+const ByteArray = imports.byteArray;
 
 const PROFILE_DIR = "/.tlp/";
 
@@ -18,37 +20,33 @@ const TLPButton = new Lang.Class({
 
     // panel icon
 
-    this.actor.add_actor(
-      new St.Icon({
-        icon_name: "applications-science-symbolic",
-        style_class: "system-status-icon",
-      })
-    );
+    let label = new St.Label({
+      y_expand: true,
+      y_align: Clutter.ActorAlign.CENTER,
+    });
 
-    // popup menu title
+    let clutterText = label.get_clutter_text();
+    this._labelText = clutterText;
+    this._labelText.text = "???";
 
-    let itemTitle = new PopupMenu.PopupMenuItem("TLP Profile");
-    itemTitle.actor.reactive = false;
+    this.actor.add_child(label);
 
-    let menuTitle = new PopupMenu.PopupMenuSection();
-    menuTitle.addMenuItem(itemTitle);
-
-    this.menu.addMenuItem(menuTitle);
-    this.menu.addMenuItem(new PopupMenu.PopupSeparatorMenuItem());
+    this._itemProfiles = null;
+    this._profileDir = GLib.get_home_dir() + PROFILE_DIR;
 
     // popup menu profiles
 
     this._menuProfiles = new PopupMenu.PopupMenuSection();
     this.menu.addMenuItem(this._menuProfiles);
 
-    this._itemProfiles = null;
-    this._profileDir = GLib.get_home_dir() + PROFILE_DIR;
-  },
+    this.menu.connect(
+      "open-state-changed",
+      Lang.bind(this, function(menu, open) {
+        if (open) this._updateProfiles();
+      })
+    );
 
-  _onOpenStateChanged: function(menu, open) {
-    if (open) this._updateProfiles();
-
-    this.parent(menu, open);
+    this._updateProfiles();
   },
 
   _updateProfiles: function() {
@@ -59,12 +57,14 @@ const TLPButton = new Lang.Class({
     // list profiles
 
     let output = GLib.spawn_command_line_sync("ls " + this._profileDir);
-    this._profiles = output[1].toString().split("\n");
+    this._profiles = ByteArray.toString(output[1]).split("\n");
     this._profiles.pop();
 
     // create directory if it doesn't exist
 
-    if (output[2].toString().indexOf("No such file or directory") != -1)
+    if (
+      ByteArray.toString(output[2]).indexOf("No such file or directory") != -1
+    )
       GLib.spawn_command_line_async("mkdir " + this._profileDir);
 
     let len = this._profiles.length;
@@ -105,6 +105,7 @@ const TLPButton = new Lang.Class({
     for (let i = 0; i < this._itemProfiles.length; ++i)
       this._itemProfiles[i].setOrnament(PopupMenu.Ornament.NONE);
     this._itemProfiles[index].setOrnament(PopupMenu.Ornament.DOT);
+    this._labelText.text = this._profiles[index];
 
     // run tlp update script
     // (cp script /etc/default/tlp && tlp start)
@@ -125,20 +126,22 @@ const TLPButton = new Lang.Class({
   _checkActive: function() {
     if (this._profiles.length == 0) return;
 
-    let config = GLib.spawn_command_line_sync("tlp-stat -c")[1]
-      .toString()
-      .split("\n");
+    let config = ByteArray.toString(
+      GLib.spawn_command_line_sync("tlp-stat -c")[1]
+    ).split("\n");
     let profile;
 
     for (let i = 0; i < this._profiles.length; ++i) {
-      profile = GLib.spawn_command_line_sync(
-        "cat '".concat(this._profileDir, this._profiles[i], "'")
-      )[1]
-        .toString()
-        .split("\n");
+      profile = ByteArray.toString(
+        GLib.spawn_command_line_sync(
+          "cat '".concat(this._profileDir, this._profiles[i], "'")
+        )[1]
+      ).split("\n");
 
       if (this._profileMatch(config, profile)) {
         this._itemProfiles[i].setOrnament(PopupMenu.Ornament.DOT);
+        this._labelText.text = this._profiles[i];
+
         break;
       }
     }

@@ -15,7 +15,7 @@ const TLPButton = new Lang.Class({
   Name: "TLPButton.button",
   Extends: PanelMenu.Button,
 
-  _init: function() {
+  _init: function () {
     this.parent(0.0, "TLP Switcher");
 
     // panel icon
@@ -41,7 +41,7 @@ const TLPButton = new Lang.Class({
 
     this.menu.connect(
       "open-state-changed",
-      Lang.bind(this, function(menu, open) {
+      Lang.bind(this, function (menu, open) {
         if (open) this._updateProfiles();
       })
     );
@@ -49,7 +49,7 @@ const TLPButton = new Lang.Class({
     this._updateProfiles();
   },
 
-  _updateProfiles: function() {
+  _updateProfiles: function () {
     // clear existing
 
     this._menuProfiles.removeAll();
@@ -78,7 +78,7 @@ const TLPButton = new Lang.Class({
         p.id = i;
         p.connect(
           "activate",
-          Lang.bind(this, function(actor, event) {
+          Lang.bind(this, function (actor, event) {
             this._activate(actor.id);
           })
         );
@@ -99,7 +99,7 @@ const TLPButton = new Lang.Class({
     }
   },
 
-  _activate: function(index) {
+  _activate: function (index) {
     // update active ornament
 
     for (let i = 0; i < this._itemProfiles.length; ++i)
@@ -123,12 +123,13 @@ const TLPButton = new Lang.Class({
     if (parsed) Util.spawn(args);
   },
 
-  _checkActive: function() {
+  _checkActive: function () {
     if (this._profiles.length == 0) return;
 
     let config = ByteArray.toString(
-      GLib.spawn_command_line_sync("tlp-stat -c")[1]
-    ).split("\n");
+      GLib.spawn_command_line_sync("cat '/etc/tlp.conf'")[1]
+    );
+
     let profile;
 
     for (let i = 0; i < this._profiles.length; ++i) {
@@ -136,23 +137,15 @@ const TLPButton = new Lang.Class({
         GLib.spawn_command_line_sync(
           "cat '".concat(this._profileDir, this._profiles[i], "'")
         )[1]
-      ).split("\n");
+      );
 
-      if (this._profileMatch(config, profile)) {
+      if (config === profile) {
         this._itemProfiles[i].setOrnament(PopupMenu.Ornament.DOT);
         this._labelText.text = this._profiles[i];
 
         break;
       }
     }
-  },
-
-  _profileMatch: function(config, profile) {
-    for (let i = 3; i < config.length; ++i) {
-      if (config[i] && profile.indexOf(config[i]) == -1) return false;
-    }
-
-    return true;
   },
 });
 
